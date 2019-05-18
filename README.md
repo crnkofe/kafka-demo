@@ -16,7 +16,7 @@ Starto docker!
 docker-compose up -d
 ```
 
-Add kafka-demo queue inside docker
+Add kafka-demo topic inside docker
 ```
 docker exec -it kafkademo_kafka_1 /bin/bash
 # TODO: add queue
@@ -42,3 +42,12 @@ python demo.py
 ```
 
 ## Setup (Clojure)
+
+Install leiningen.
+
+Run project after setting up a topic
+```bash
+cd streamer
+lein deps
+lein run
+```

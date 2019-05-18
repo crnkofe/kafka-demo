@@ -19,7 +19,7 @@ docker-compose up -d
 Add kafka-demo topic inside docker
 ```
 docker exec -it kafkademo_kafka_1 /bin/bash
-# TODO: add queue
+# TODO: add topic
 ```
 
 ## Setup (Python)

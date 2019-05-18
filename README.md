@@ -9,6 +9,19 @@ Python Consumer just echoes whatever is on the queue.
 Clojure consumer calculates a first-order derivative and latest state.
 Note that Clojure consumer needs to be ran after python script.
 
+## Setup (Kafka)
+
+Starto docker!
+```bash
+docker-compose up -d
+```
+
+Add kafka-demo queue inside docker
+```
+docker exec -it kafkademo_kafka_1 /bin/bash
+# TODO: add queue
+```
+
 ## Setup (Python)
 
 Install virtualenvwrapper, docker, docker-compose.
@@ -23,13 +36,9 @@ Install requirements:
 pip install --requirements requirements.txt
 ```
 
-Starto docker!
-```bash
-docker-compose up -d
-```
-
-Run script.
+Run script and enjoy.
 ```bash
 python demo.py
 ```
+
 ## Setup (Clojure)

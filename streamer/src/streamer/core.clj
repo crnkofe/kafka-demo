@@ -2,18 +2,27 @@
   (:import
    (org.apache.kafka.common.serialization Serde Serdes Serializer)
    (org.apache.kafka.streams StreamsConfig KafkaStreams StreamsBuilder)
+   (org.apache.kafka.streams KeyValue)
    (org.apache.kafka.streams.kstream ValueMapper)
+   (org.apache.kafka.streams.kstream KeyValueMapper)
    (org.apache.kafka.streams.kstream Printed)
 )
+(:require [cheshire.core :refer :all])
   (:gen-class))
+
+(defn kvalue-mapper [key payload]
+ (let [decoded-payload (decode payload)]
+  (KeyValue. key {:key key, :id (get decoded-payload "id"), :value (get decoded-payload "value")})
+ )
+)
 
 (defn derivative [input-topic]
   (let [builder (StreamsBuilder.)]
     (->
      (.stream builder input-topic) ;; Create the source node of the stream
+     (.map (reify KeyValueMapper (apply [_ k v] (kvalue-mapper k v))))
 	 (.print (Printed/toSysOut )))
     builder))
-
 
 (defn -main [& args]
   (def properties

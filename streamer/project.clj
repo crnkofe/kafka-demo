@@ -12,6 +12,7 @@
                  [org.apache.kafka/connect-json "2.0.0"]
                  [org.springframework.kafka/spring-kafka "1.2.2.RELEASE"]
                  [org.slf4j/slf4j-log4j12 "1.7.1"]
+                 [cheshire "5.8.1"]
                  [log4j/log4j "1.2.17" :exclusions [javax.mail/mail
                                                     javax.jms/jms
                                                     com.sun.jmdk/jmxtools

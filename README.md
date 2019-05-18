@@ -4,9 +4,12 @@ Demonstrates writing to and processing simple timeseries data.
 
 Producer generates a double sinusoid.
 
-Consumer calculates a first-order derivative.
+Python Consumer just echoes whatever is on the queue.
 
-## Setup
+Clojure consumer calculates a first-order derivative and latest state.
+Note that Clojure consumer needs to be ran after python script.
+
+## Setup (Python)
 
 Install virtualenvwrapper, docker, docker-compose.
 
@@ -29,3 +32,4 @@ Run script.
 ```bash
 python demo.py
 ```
+## Setup (Clojure)

@@ -12,7 +12,7 @@
 
 (defn kvalue-mapper [key payload]
  (let [decoded-payload (decode payload)]
-  (KeyValue. key {:key key, :id (get decoded-payload "id"), :value (get decoded-payload "value")})
+  (KeyValue. (quot (get decoded-payload "ts") 1000) {:timestamp (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
  )
 )
 

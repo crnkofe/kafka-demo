@@ -19,7 +19,7 @@ docker-compose up -d
 Add kafka-demo topic inside docker
 ```
 docker exec -it kafkademo_kafka_1 /bin/bash
-# TODO: add topic
+kafka-topics.sh --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic kafka-demo
 ```
 
 ## Setup (Python)

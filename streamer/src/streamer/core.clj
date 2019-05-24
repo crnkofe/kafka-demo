@@ -75,12 +75,33 @@
   (KeyValue. (quot (get decoded-payload "ts") 1000) {:timestamp (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
  ))
 
+
+(defn kvalue-mapper-minutes-two [key payload]
+ (let [decoded-payload (decode payload)]
+  (KeyValue. (quot (quot (get decoded-payload "ts") 1000) 2) {:timestamp (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
+ ))
+
 (defn identity-map [input-topic]
   (let [builder (StreamsBuilder.)]
     (->
      (.stream builder input-topic) ;; Create the source node of the stream
      (.map (reify KeyValueMapper (apply [_ k v] (kvalue-mapper k v))))
 	 (.print (Printed/toSysOut )))
+    builder))
+
+(defn identity-stream [input-topic]
+  (let [builder (StreamsBuilder.)
+        window (.advanceBy (TimeWindows/of  60000) 1000)
+		jsonSerdes (Serdes/serdeFrom (JsonSerializer. []) (JsonDeserializer. []))
+		serializer (Serialized/with (Serdes/String) (Serdes/Long))
+		string-serializer (Serialized/with (Serdes/String) (Serdes/Long))]
+	(try
+	  (->
+		  (.stream builder input-topic) ;; Create the source node of the stream
+		  (.map (reify KeyValueMapper (apply [_ k v] (kvalue-mapper-minutes k v))))
+		  (.to "kafka-demo-count" (Produced/with (Serdes/Long) jsonSerdes)))
+      (catch Exception e (println (str "caught exception: " (.toString e))))
+      (finally (println "This is our final block")))
     builder))
 
 (defn max-window-stream [input-topic]
@@ -92,7 +113,10 @@
 	(try
 	  (->
 		  (.stream builder input-topic) ;; Create the source node of the stream
-		  (.map (reify KeyValueMapper (apply [_ k v] (kvalue-mapper-minutes k v))))
+		  (.map (reify KeyValueMapper (apply [_ k v] (kvalue-mapper-minutes-two k v))))
+          (.groupByKey (Serialized/with (Serdes/Long) jsonSerdes))
+          (.count)
+          (.toStream)
 		  (.to "kafka-demo-count" (Produced/with (Serdes/Long) jsonSerdes)))
       (catch Exception e (println (str "caught exception: " (.toString e))))
       (finally (println "This is our final block")))

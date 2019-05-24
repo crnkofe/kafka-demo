@@ -39,7 +39,8 @@ while True:
             for message in demo_consumer:
                 print("Consumer: {ts} {id} {val}".format(ts=message.timestamp, id=message.value['id'], val=message.value['value']))
             for message in demo_count_consumer:
-                print("Consumer Count: {ts} {id} {val}".format(ts=message.timestamp, id=message.value['id'], val=message.value['value']))
+                print("Count consumer: {ts} {val}".format(ts=message.timestamp, val=message.value))
+                # print("Consumer Count: {ts} {id} {val}".format(ts=message.timestamp, id=message.value['id'], val=message.value['value']))
 
     except KeyboardInterrupt:
         print("Terminating gracefully...")

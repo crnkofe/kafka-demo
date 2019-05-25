@@ -15,6 +15,11 @@
    (org.apache.kafka.streams.kstream Printed)
    (org.apache.kafka.streams.kstream TimeWindows)
    (org.apache.kafka.streams.kstream Reducer)
+   (org.apache.kafka.streams.kstream SessionWindows)
+   (org.apache.kafka.streams.kstream WindowedSerdes)
+   (org.apache.kafka.streams.kstream Grouped)
+   (org.apache.kafka.streams.kstream Materialized)
+   (java.time Duration)
 )
 (:require [cheshire.core :refer :all])
   (:gen-class))
@@ -63,22 +68,34 @@
 (JsonDeserializer. opts)))
 
 
+
+(defn kvalue-mapper-default [key payload]
+ (let [decoded-payload (decode payload)]
+  (KeyValue. (get decoded-payload "ts") {:ts (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
+ ))
+
 ;; attach seconds timestamp as key to stream
 (defn kvalue-mapper [key payload]
  (let [decoded-payload (decode payload)]
-  (KeyValue. (quot (get decoded-payload "ts") 1000) {:timestamp (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
+  (KeyValue. (quot (get decoded-payload "ts") 1000) {:ts (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
+ ))
+
+
+(defn kvalue-mapper-seconds [key payload]
+ (let [decoded-payload (decode payload)]
+  (KeyValue. (quot (get decoded-payload "ts") 1000) {:ts (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
  ))
 
 
 (defn kvalue-mapper-minutes [key payload]
  (let [decoded-payload (decode payload)]
-  (KeyValue. (quot (get decoded-payload "ts") 1000) {:timestamp (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
+  (KeyValue. (quot (quot (get decoded-payload "ts") 1000) 60) {:ts (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
  ))
 
 
-(defn kvalue-mapper-minutes-two [key payload]
+(defn kvalue-mapper-minutes-five [key payload]
  (let [decoded-payload (decode payload)]
-  (KeyValue. (quot (quot (get decoded-payload "ts") 1000) 2) {:timestamp (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
+  (KeyValue. (quot (quot (quot (get decoded-payload "ts") 1000) 60) 5) {:ts (get decoded-payload "ts"), :id (get decoded-payload "id"), :value (get decoded-payload "value")})
  ))
 
 (defn identity-map [input-topic]
@@ -104,7 +121,7 @@
       (finally (println "This is our final block")))
     builder))
 
-(defn max-window-stream [input-topic]
+(defn count-stream [input-topic]
   (let [builder (StreamsBuilder.)
         window (.advanceBy (TimeWindows/of  60000) 1000)
 		jsonSerdes (Serdes/serdeFrom (JsonSerializer. []) (JsonDeserializer. []))
@@ -113,13 +130,69 @@
 	(try
 	  (->
 		  (.stream builder input-topic) ;; Create the source node of the stream
-		  (.map (reify KeyValueMapper (apply [_ k v] (kvalue-mapper-minutes-two k v))))
+		  (.map (reify KeyValueMapper (apply [_ k v] (kvalue-mapper-minutes k v))))
           (.groupByKey (Serialized/with (Serdes/Long) jsonSerdes))
           (.count)
           (.toStream)
 		  (.to "kafka-demo-count" (Produced/with (Serdes/Long) jsonSerdes)))
       (catch Exception e (println (str "caught exception: " (.toString e))))
       (finally (println "This is our final block")))
+    builder))
+
+(defn count-window-stream [input-topic]
+  "Group timestamped values by 5 minutes
+  Window them by 1 minute non-overlapping intervals
+  and compute counted values in that window
+  output that to a different topic
+  "
+  (let [builder (StreamsBuilder.)
+        window (.advanceBy (TimeWindows/of  60000) 1000)
+		jsonSerdes (Serdes/serdeFrom (JsonSerializer. []) (JsonDeserializer. []))
+        windowSerdes (WindowedSerdes/timeWindowedSerdeFrom Long)
+		serializer (Serialized/with (Serdes/String) (Serdes/Long))
+		string-serializer (Serialized/with (Serdes/String) (Serdes/Long))]
+	(try
+	  (->
+		  (.stream builder input-topic) ;; Create the source node of the stream
+		  (.map (reify KeyValueMapper (apply [_ k v] (kvalue-mapper-minutes-five k v))))
+          (.groupByKey (Serialized/with (Serdes/Long) jsonSerdes))
+          (.windowedBy (.advanceBy (TimeWindows/of (Duration/ofMinutes 1) ) (Duration/ofSeconds 60)))
+          (.count (Materialized/with (Serdes/Long) (Serdes/Long)))
+          (.toStream)
+		  (.to "kafka-demo-count" (Produced/with windowSerdes (Serdes/Long))))
+      (catch Exception e (println (str "caught exception: " (.toString e)))))
+    builder))
+
+(defn difference [p n]
+  (let [diff (- (get n "value") (get p "value"))]
+    ;; (println diff (get p "ts") (get n "ts"))
+    ;; (println diff (get p "value") (get n "value"))
+    {"ts" (get n "ts"), "id" (get n "id"), "value" (get n "value"), "difference" diff}
+  )
+  )
+
+(defn derivative-stream [input-topic]
+  "Group timestamped values by 1 minute
+
+  and compute counted values in that window
+  output that to a different topic
+  "
+  (let [builder (StreamsBuilder.)
+        window (.advanceBy (TimeWindows/of  60000) 1000)
+		jsonSerdes (Serdes/serdeFrom (JsonSerializer. []) (JsonDeserializer. []))
+        windowSerdes (WindowedSerdes/timeWindowedSerdeFrom Long)
+		serializer (Serialized/with (Serdes/String) (Serdes/Long))
+		string-serializer (Serialized/with (Serdes/String) (Serdes/Long))]
+	(try
+	  (->
+		  (.stream builder input-topic) ;; Create the source node of the stream
+		  (.map (reify KeyValueMapper (apply [_ k v] (kvalue-mapper-minutes k v))))
+          (.groupByKey (Serialized/with (Serdes/Long) jsonSerdes))
+          (.windowedBy (.advanceBy (TimeWindows/of (Duration/ofSeconds 10) ) (Duration/ofSeconds 10)))
+          (.reduce (reify Reducer (apply [_ p n] (difference p n))))
+          (.toStream)
+		  (.to "kafka-demo-derivative" (Produced/with windowSerdes jsonSerdes)))
+      (catch Exception e (println (str "caught exception: " (.toString e)))))
     builder))
 
 (defn -main [& args]
@@ -136,7 +209,7 @@
 
   (def streams
     (KafkaStreams. 
-      (.build (max-window-stream input-topic)) config))
+      (.build (derivative-stream input-topic)) config))
 
   (.start streams)
   (Thread/sleep (* 60000 10))
